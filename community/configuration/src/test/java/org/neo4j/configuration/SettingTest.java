@@ -19,6 +19,7 @@
  */
 package org.neo4j.configuration;
 
+import inet.ipaddr.IPAddressString;
 import org.junit.jupiter.api.DynamicTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestFactory;
@@ -68,6 +69,7 @@ import static org.neo4j.configuration.SettingConstraints.min;
 import static org.neo4j.configuration.SettingConstraints.range;
 import static org.neo4j.configuration.SettingValueParsers.BOOL;
 import static org.neo4j.configuration.SettingValueParsers.BYTES;
+import static org.neo4j.configuration.SettingValueParsers.CIDR_IP;
 import static org.neo4j.configuration.SettingValueParsers.DOUBLE;
 import static org.neo4j.configuration.SettingValueParsers.DURATION;
 import static org.neo4j.configuration.SettingValueParsers.DURATION_RANGE;
@@ -316,6 +318,16 @@ class SettingTest
     }
 
     @Test
+    void testCidrIp()
+    {
+        var setting = (SettingImpl<IPAddressString>) setting( "setting", CIDR_IP );
+        assertEquals( new IPAddressString( "1.1.1.0/8" ),
+                      setting.parse( "1.1.1.0/8" ) );
+        assertThrows( IllegalArgumentException.class,
+                      () -> setting.parse( "garbage" ) );
+    }
+
+    @Test
     void testSocket()
     {
         var setting = (SettingImpl<SocketAddress>) setting( "setting", SOCKET_ADDRESS );
@@ -409,10 +421,16 @@ class SettingTest
                 "value1",                   // value1
                 "value2 value3",            // value2 value3
                 "\"value 4\" \"value 5\"",  // "value 4" "value 5"
-                "\"value 6\"",              // "value 6"
+                "\"value  6\"",             // "value  6"
                 "value\"quoted\"",          // value"quoted"
                 "\"value \"\"\"",           // "value """
                 "\"\"quote",                // ""quote          Escaped start quote
+                " valuewithspace  ",        // valuewithspace
+                "strwithctrl\u000b\u0002",  // some control characters
+                " values  with   spaces ",  // values  with  spaces
+                "\"one quoted\"   value  ", // one quoted value             Note double spaces
+                "  one  \"quoted   value\"",// one quoted value             Note double spaces
+                "\"two quoted\"  \"values\""// "two quoted" "values"        Note double spaces
             };
         var outputs = new String[]
             {
@@ -421,10 +439,21 @@ class SettingTest
                 "value3",                   // value3
                 "value 4",                  // value 4
                 "value 5",                  // value 5
-                "value 6",                  // value 6
+                "value  6",                 // value  6
                 "value\"quoted\"",          // value"quoted"
                 "value \"",                 // value "
                 "\"quote",                  // "quote
+                "valuewithspace",           // valuewithspace
+                "strwithctrl",              // some control characters
+                "values",                   // values
+                "with",                     // with
+                "spaces",                   // spaces
+                "one quoted",               // one quoted
+                "value",                    // value
+                "one",                      // one
+                "quoted   value",           // quoted   value
+                "two quoted",               // two quoted
+                "values",                   // values
             };
         var actualSettings = setting.parse( String.join( System.lineSeparator(), inputs ) );
         var expectedSettings = String.join( System.lineSeparator(), outputs );

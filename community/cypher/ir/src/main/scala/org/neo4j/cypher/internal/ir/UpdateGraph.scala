@@ -23,6 +23,7 @@ import org.neo4j.cypher.internal.ast.semantics.SemanticTable
 import org.neo4j.cypher.internal.expressions.ContainerIndex
 import org.neo4j.cypher.internal.expressions.FunctionInvocation
 import org.neo4j.cypher.internal.expressions.LabelName
+import org.neo4j.cypher.internal.expressions.Literal
 import org.neo4j.cypher.internal.expressions.MapExpression
 import org.neo4j.cypher.internal.expressions.Property
 import org.neo4j.cypher.internal.expressions.PropertyKeyName
@@ -255,8 +256,12 @@ trait UpdateGraph {
       }
 
       noLabelOrPropOverlap || //MATCH () CREATE/MERGE (...)?
-          (labelsOnCurrentNode intersect labelsToCreate).nonEmpty || //MATCH (:A) CREATE (:A)?
-          propertiesOnCurrentNode.exists(propertiesToCreate.overlaps) || //MATCH ({prop:42}) CREATE ({prop:...})
+          (!currentNode.isStable &&
+            labelsOnCurrentNode.nonEmpty &&
+            (labelsOnCurrentNode subsetOf labelsToCreate)) || //MATCH (:A:B) CREATE (:A:B:C)?
+          (!currentNode.isStable &&
+            labelsOnCurrentNode.isEmpty &&
+            propertiesOnCurrentNode.exists(propertiesToCreate.overlaps)) || //MATCH ({prop:42}) CREATE ({prop:...})
           //MATCH (n:A), (m:B) REMOVE n:B
           //MATCH (n:A), (m:A) REMOVE m:A
           (labelsToRemove intersect labelsOnCurrentNode).nonEmpty
@@ -367,6 +372,7 @@ trait UpdateGraph {
    */
   def setPropertyOverlap(qgWithInfo: QgWithLeafInfo)(implicit semanticTable: SemanticTable): Boolean = {
     val hasDynamicProperties = qgWithInfo.treeExists {
+      case ContainerIndex(_, _: Literal) => false
       case _: ContainerIndex => true
     }
 

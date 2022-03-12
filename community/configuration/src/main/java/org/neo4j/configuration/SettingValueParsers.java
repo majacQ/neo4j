@@ -19,6 +19,8 @@
  */
 package org.neo4j.configuration;
 
+import inet.ipaddr.AddressStringException;
+import inet.ipaddr.IPAddressString;
 import org.apache.commons.lang3.StringUtils;
 
 import java.net.URI;
@@ -108,6 +110,36 @@ public final class SettingValueParsers
         public Class<SecureString> getType()
         {
             return SecureString.class;
+        }
+    };
+
+    public static final SettingValueParser<IPAddressString> CIDR_IP = new SettingValueParser<>()
+    {
+        @Override
+        public IPAddressString parse( String value )
+        {
+            IPAddressString ipAddress = new IPAddressString( value.trim() );
+            try
+            {
+                ipAddress.validate();
+            }
+            catch ( AddressStringException e )
+            {
+                throw new IllegalArgumentException( format( "'%s' is not a valid CIDR ip", value ), e );
+            }
+            return ipAddress;
+        }
+
+        @Override
+        public String getDescription()
+        {
+            return "an ip with subnet in CDIR format. e.g. 127.168.0.1/8";
+        }
+
+        @Override
+        public Class<IPAddressString> getType()
+        {
+            return IPAddressString.class;
         }
     };
 
@@ -279,7 +311,7 @@ public final class SettingValueParsers
                         {
                             builder.append( ' ' );
                         }
-                        else
+                        else if ( !atBoundary )
                         {
                             // Start interpreting the rest as a new setting
                             builder.append( System.lineSeparator() );
@@ -341,7 +373,7 @@ public final class SettingValueParsers
                 {
                     builder.append( System.lineSeparator() );
                 }
-                builder.append( parseLine( settings[i] ) );
+                builder.append( parseLine( settings[i].trim() ) );
             }
             return builder.toString();
         }
@@ -827,7 +859,7 @@ public final class SettingValueParsers
         @Override
         public String getDescription()
         {
-            return "A valid database name (aliases are not supported) containing only alphabetic characters, numbers, dots and dashes " +
+            return "A valid database name containing only alphabetic characters, numbers, dots and dashes " +
                    "with a length between " + DatabaseNameValidator.MINIMUM_DATABASE_NAME_LENGTH + " and " +
                    DatabaseNameValidator.MAXIMUM_DATABASE_NAME_LENGTH + " characters, " +
                    "starting with an alphabetic character but not with the name 'system'";

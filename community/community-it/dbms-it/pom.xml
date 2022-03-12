@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.neo4j</groupId>
         <artifactId>community-integration-tests</artifactId>
-        <version>4.4.1-SNAPSHOT</version>
+        <version>4.4.5-SNAPSHOT</version>
     </parent>
 
     <groupId>org.neo4j.community</groupId>
@@ -21,6 +21,7 @@
         <licensing.prepend.text>licensing/notice-gpl-prefix.txt</licensing.prepend.text>
         <moduleName>org.neo4j.community.dbms.it</moduleName>
         <default.jupiter.test.mode>concurrent</default.jupiter.test.mode>
+        <test.runner.jvm.settings.additional>-Djdk.attach.allowAttachSelf=true</test.runner.jvm.settings.additional>
     </properties>
 
     <scm>
