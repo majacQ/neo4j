@@ -287,6 +287,32 @@ public final class SettingConstraints
         };
     }
 
+    public static <T> SettingConstraint<List<T>> minSize( final int size )
+    {
+        return new SettingConstraint<>()
+        {
+            @Override
+            public void validate( List<T> value, Configuration config )
+            {
+                if ( value == null )
+                {
+                    throw new IllegalArgumentException( "can not be null" );
+                }
+
+                if ( value.size() <= size )
+                {
+                    throw new IllegalArgumentException( format( "needs to be greater than size of %s", size ) );
+                }
+            }
+
+            @Override
+            public String getDescription()
+            {
+                return format( "has minimum size `%s`", size );
+            }
+        };
+    }
+
     public static final SettingConstraint<SocketAddress> HOSTNAME_ONLY = new SettingConstraint<>()
     {
         @Override

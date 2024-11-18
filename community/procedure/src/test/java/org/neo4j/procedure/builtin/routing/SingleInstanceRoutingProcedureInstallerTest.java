@@ -29,6 +29,7 @@ import org.neo4j.kernel.database.DatabaseReferenceRepository;
 import org.neo4j.kernel.database.DefaultDatabaseResolver;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.procedure.impl.GlobalProceduresRegistry;
+import org.neo4j.time.Clocks;
 
 import static java.util.stream.Collectors.toSet;
 import static org.eclipse.collections.impl.set.mutable.UnifiedSet.newSetWith;
@@ -52,8 +53,9 @@ class SingleInstanceRoutingProcedureInstallerTest
         var logProvider = NullLogProvider.getInstance();
         var defaultDatabaseResolver = mock( DefaultDatabaseResolver.class );
 
-        var installer = new SingleInstanceRoutingProcedureInstaller( databaseAvailabilityChecker, clientRoutingDomainChecker,
-                                                                     portRegister, config, logProvider, databaseReferenceRepo, defaultDatabaseResolver );
+        var installer = new SingleInstanceRoutingProcedureInstaller( databaseAvailabilityChecker,
+                clientRoutingDomainChecker, portRegister, config, logProvider, databaseReferenceRepo,
+                defaultDatabaseResolver, Clocks.fakeClock() );
         var procedures = spy( new GlobalProceduresRegistry() );
 
         installer.install( procedures );

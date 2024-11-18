@@ -19,6 +19,7 @@
  */
 package org.neo4j.procedure.builtin.routing;
 
+import java.time.Clock;
 import java.util.List;
 
 import org.neo4j.configuration.Config;
@@ -26,6 +27,7 @@ import org.neo4j.configuration.connectors.ConnectorPortRegister;
 import org.neo4j.kernel.database.DatabaseReferenceRepository;
 import org.neo4j.kernel.database.DefaultDatabaseResolver;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.time.Clocks;
 
 import static org.neo4j.procedure.builtin.routing.RoutingTableTTLProvider.ttlFromConfig;
 
@@ -40,10 +42,11 @@ public final class SingleInstanceRoutingProcedureInstaller extends AbstractRouti
     private final Config config;
     private final LogProvider logProvider;
     private final DefaultDatabaseResolver defaultDatabaseResolver;
+    private final Clock clock;
 
     public SingleInstanceRoutingProcedureInstaller( DatabaseAvailabilityChecker databaseAvailabilityChecker,
             ClientRoutingDomainChecker clientRoutingDomainChecker, ConnectorPortRegister portRegister, Config config, LogProvider logProvider,
-            DatabaseReferenceRepository databaseReferenceRepo, DefaultDatabaseResolver defaultDatabaseResolver )
+            DatabaseReferenceRepository databaseReferenceRepo, DefaultDatabaseResolver defaultDatabaseResolver, Clock clock )
     {
         this.databaseAvailabilityChecker = databaseAvailabilityChecker;
         this.clientRoutingDomainChecker = clientRoutingDomainChecker;
@@ -52,6 +55,7 @@ public final class SingleInstanceRoutingProcedureInstaller extends AbstractRouti
         this.logProvider = logProvider;
         this.databaseReferenceRepo = databaseReferenceRepo;
         this.defaultDatabaseResolver = defaultDatabaseResolver;
+        this.clock = clock;
     }
 
     @Override
@@ -62,6 +66,6 @@ public final class SingleInstanceRoutingProcedureInstaller extends AbstractRouti
                 portRegister, RoutingOption.ROUTE_WRITE_AND_READ, config, logProvider, ttlFromConfig( config ) );
 
         return new GetRoutingTableProcedure( namespace, DESCRIPTION, databaseReferenceRepo, validator, routingTableProvider, clientRoutingDomainChecker,
-                                             config, logProvider, defaultDatabaseResolver );
+                                             config, logProvider, defaultDatabaseResolver, clock );
     }
 }

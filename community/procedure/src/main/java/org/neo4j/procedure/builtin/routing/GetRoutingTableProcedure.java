@@ -19,6 +19,8 @@
  */
 package org.neo4j.procedure.builtin.routing;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -41,6 +43,7 @@ import org.neo4j.kernel.database.DefaultDatabaseResolver;
 import org.neo4j.logging.Log;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.procedure.Mode;
+import org.neo4j.time.Clocks;
 import org.neo4j.values.AnyValue;
 import org.neo4j.values.storable.TextValue;
 import org.neo4j.values.virtual.MapValue;
@@ -74,19 +77,25 @@ public final class GetRoutingTableProcedure implements CallableProcedure
     private final Supplier<Boolean> boltEnabled;
     private final boolean logInfoRoutingTableResult;
     private final DefaultDatabaseResolver defaultDatabaseResolver;
+    private final boolean clientProvidedRouterEnabled;
+    private final List<String> clientProvidedRouterPrefixes;
+    private final Duration clientProvidedRouterPrefixRotationPeriod;
+    private final String clientProvidedRouterSuffix;
+    private final Clock clock;
 
     public GetRoutingTableProcedure( List<String> namespace, String description, DatabaseReferenceRepository databaseReferenceRepo,
-            RoutingTableProcedureValidator validator, SingleAddressRoutingTableProvider routingTableProvider,
-            ClientRoutingDomainChecker clientRoutingDomainChecker, Config config, LogProvider logProvider, DefaultDatabaseResolver defaultDatabaseResolver )
+                                    RoutingTableProcedureValidator validator, SingleAddressRoutingTableProvider routingTableProvider,
+                                    ClientRoutingDomainChecker clientRoutingDomainChecker, Config config, LogProvider logProvider,
+                                    DefaultDatabaseResolver defaultDatabaseResolver, Clock clock )
     {
         this( namespace, description, databaseReferenceRepo, validator, routingTableProvider,
-              routingTableProvider, clientRoutingDomainChecker, config, logProvider, defaultDatabaseResolver );
+              routingTableProvider, clientRoutingDomainChecker, config, logProvider, defaultDatabaseResolver, clock );
     }
 
     public GetRoutingTableProcedure( List<String> namespace, String description, DatabaseReferenceRepository databaseReferenceRepo,
-            RoutingTableProcedureValidator validator, ClientSideRoutingTableProvider clientSideRoutingTableProvider,
-            ServerSideRoutingTableProvider serverSideRoutingTableProvider, ClientRoutingDomainChecker clientRoutingDomainChecker,
-            Config config, LogProvider logProvider, DefaultDatabaseResolver defaultDatabaseResolver )
+                                    RoutingTableProcedureValidator validator, ClientSideRoutingTableProvider clientSideRoutingTableProvider,
+                                    ServerSideRoutingTableProvider serverSideRoutingTableProvider, ClientRoutingDomainChecker clientRoutingDomainChecker,
+                                    Config config, LogProvider logProvider, DefaultDatabaseResolver defaultDatabaseResolver, Clock clock )
     {
         this.signature = buildSignature( namespace, description );
         this.databaseReferenceRepo = databaseReferenceRepo;
@@ -99,6 +108,12 @@ public final class GetRoutingTableProcedure implements CallableProcedure
         this.boltEnabled = () -> config.get( BoltConnector.enabled );
         this.logInfoRoutingTableResult = config.get( GraphDatabaseInternalSettings.pagecache_warmup_blocking );
         this.defaultDatabaseResolver = defaultDatabaseResolver;
+        this.clientProvidedRouterEnabled = config.get(GraphDatabaseInternalSettings.client_provided_router_enabled);
+        this.clientProvidedRouterPrefixes = config.get(GraphDatabaseInternalSettings.client_provided_router_prefixes);
+        this.clientProvidedRouterSuffix = config.get(GraphDatabaseInternalSettings.client_provided_router_suffix);
+        this.clientProvidedRouterPrefixRotationPeriod =
+                config.get(GraphDatabaseInternalSettings.client_provided_router_prefix_rotation_period);
+        this.clock = clock;
     }
 
     @Override
@@ -143,22 +158,34 @@ public final class GetRoutingTableProcedure implements CallableProcedure
     {
         var clientProvidedAddress = RoutingTableProcedureHelpers.findClientProvidedAddress( routingContext, BoltConnector.DEFAULT_PORT, log );
         var isInternalRef = databaseReference instanceof DatabaseReference.Internal;
+        RoutingResult result;
+
         if ( !isInternalRef )
         {
-            return serverSideRoutingTableProvider.getServerSideRoutingTable( clientProvidedAddress );
+            result = serverSideRoutingTableProvider.getServerSideRoutingTable( clientProvidedAddress );
         }
-
-        var defaultRouter = defaultRouterSupplier.get();
-        if ( configAllowsForClientSideRouting( defaultRouter, clientProvidedAddress ) )
+        else if ( configAllowsForClientSideRouting(defaultRouterSupplier.get(), clientProvidedAddress ) )
         {
             validator.isValidForClientSideRouting( (DatabaseReference.Internal) databaseReference );
-            return clientSideRoutingTableProvider.getRoutingResultForClientSideRouting( (DatabaseReference.Internal) databaseReference, routingContext );
+            result = clientSideRoutingTableProvider.getRoutingResultForClientSideRouting( (DatabaseReference.Internal) databaseReference, routingContext );
         }
         else
         {
             validator.isValidForServerSideRouting( (DatabaseReference.Internal) databaseReference );
-            return serverSideRoutingTableProvider.getServerSideRoutingTable( clientProvidedAddress );
+            result = serverSideRoutingTableProvider.getServerSideRoutingTable( clientProvidedAddress );
         }
+
+        var validClientProvidedRouterExists = clientProvidedAddress
+                .map(a -> a.getHostname().endsWith(clientProvidedRouterSuffix))
+                .orElse(false);
+        var shouldReplaceRouter = clientProvidedRouterEnabled && validClientProvidedRouterExists;
+
+        if ( shouldReplaceRouter )
+        {
+            result = replaceRouterWithClientProvidedAddress(result, clientProvidedAddress.get());
+        }
+
+        return result;
     }
 
     private DatabaseReference extractDatabaseReference( AnyValue[] input, String user ) throws ProcedureException
@@ -268,4 +295,28 @@ public final class GetRoutingTableProcedure implements CallableProcedure
         }
     }
 
+    private RoutingResult replaceRouterWithClientProvidedAddress( RoutingResult oldResult, SocketAddress clientProvidedAddress )
+    {
+
+        var millisSinceEpoch = clock.instant().toEpochMilli();
+        var prefix = calculateClientProvidedRouterPrefix(
+                this.clientProvidedRouterPrefixes,
+                this.clientProvidedRouterPrefixRotationPeriod.toMillis(),
+                millisSinceEpoch );
+
+        return new RoutingResult(
+                List.of( new SocketAddress(
+                        String.format("%s-%s", prefix, clientProvidedAddress.getHostname()),
+                        clientProvidedAddress.getPort() ) ),
+                oldResult.writeEndpoints(),
+                oldResult.readEndpoints(),
+                oldResult.ttlMillis() );
+    }
+
+    public static String calculateClientProvidedRouterPrefix( List<String> prefixes, long rotationPeriodMills, long millisSinceEpoch )
+    {
+        var periodsSinceEpoch = millisSinceEpoch / rotationPeriodMills;
+        var prefixToSelect = (int) ( periodsSinceEpoch % prefixes.size() );
+        return prefixes.get( prefixToSelect );
+    }
 }

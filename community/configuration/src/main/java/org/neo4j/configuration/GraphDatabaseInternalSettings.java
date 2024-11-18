@@ -37,6 +37,7 @@ import static org.neo4j.configuration.SettingConstraints.any;
 import static org.neo4j.configuration.SettingConstraints.is;
 import static org.neo4j.configuration.SettingConstraints.max;
 import static org.neo4j.configuration.SettingConstraints.min;
+import static org.neo4j.configuration.SettingConstraints.minSize;
 import static org.neo4j.configuration.SettingConstraints.range;
 import static org.neo4j.configuration.SettingImpl.newBuilder;
 import static org.neo4j.configuration.SettingValueParsers.BOOL;
@@ -856,4 +857,38 @@ public class GraphDatabaseInternalSettings implements SettingsDeclaration
                     .addConstraint( min( 0 ) )
                     .build();
 
+    @Internal
+    @Description(
+            "Enables returning the client address provided by a driver as the sole router in routing tables. This makes it easier for networking "
+                    + "middleware to migrate workload to new Neo4j servers, or even a new DBMS." )
+    public static final Setting<Boolean> client_provided_router_enabled = newBuilder(
+            "unsupported.dbms.routing.client_provided_router_enabled", BOOL, false)
+            .build();
+
+    @Internal
+    @Description(
+            "A list of prefixes to append to the client provided router address when the server cycles through addresses to force a routing table "
+                    + "update." )
+    public static final Setting<List<String>> client_provided_router_prefixes = newBuilder(
+            "unsupported.dbms.routing.client_provided_router_prefixes",
+            listOf(STRING),
+            List.of("a", "b", "c", "d"))
+            .addConstraint(minSize(2))
+            .build();
+
+    @Internal
+    @Description(
+            "The period of time for the server to wait between cycling client provided router address prefixes to force a routing table update." )
+    public static final Setting<Duration> client_provided_router_prefix_rotation_period = newBuilder(
+            "unsupported.dbms.routing.client_provided_router_rotation_period", DURATION, Duration.ofMinutes(1))
+            .addConstraint(range(Duration.ofSeconds(10), Duration.ofDays(1)))
+            .build();
+
+    @Internal
+    @Description(
+            "The suffix we expect on the client provided address in order to trigger the behaviour of client_provided_router_enabled and return said "
+                    + "address as the sole router in routing tables." )
+    public static final Setting<String> client_provided_router_suffix = newBuilder(
+            "unsupported.dbms.routing.client_provided_address_suffix", STRING, "endpoints.neo4j.io")
+            .build();
 }

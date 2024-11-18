@@ -288,7 +288,8 @@ public class CommunityEditionModule extends StandaloneEditionModule
         var logProvider = globalModule.getLogService().getInternalLogProvider();
         var databaseAvailabilityChecker = new DefaultDatabaseAvailabilityChecker( databaseManager );
         return new SingleInstanceRoutingProcedureInstaller( databaseAvailabilityChecker, clientRoutingDomainChecker,
-                                                            portRegister, config, logProvider, databaseReferenceRepo, defaultDatabaseResolver );
+                portRegister, config, logProvider, databaseReferenceRepo, defaultDatabaseResolver,
+                globalModule.getGlobalClock() );
     }
 
     @Override
