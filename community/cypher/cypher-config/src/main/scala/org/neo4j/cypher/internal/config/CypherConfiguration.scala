@@ -91,6 +91,7 @@ class CypherConfiguration private (val config: Config) {
   val compiledExpressionMethodLimit: Int =
     config.get(GraphDatabaseInternalSettings.cypher_expression_compiled_method_limit)
   val operatorFusingMethodLimit: Int = config.get(GraphDatabaseInternalSettings.cypher_operator_compiled_method_limit)
+  val pipelinedDynamicSchedulingEnabled: Boolean = config.get(GraphDatabaseInternalSettings.cypher_pipelined_dynamic_scheduling_enabled)
 
   //dynamic configurations
   private var _obfuscateLiterals: Boolean = config.get(GraphDatabaseSettings.log_queries_obfuscate_literals)

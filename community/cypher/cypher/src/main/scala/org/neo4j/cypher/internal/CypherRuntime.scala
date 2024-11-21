@@ -235,7 +235,8 @@ object CypherRuntimeConfiguration {
       enableMonitors = config.enableMonitors,
       executionPlanCacheSize = config.executionPlanCacheSize,
       compiledExpressionMethodLimit = config.compiledExpressionMethodLimit,
-      operatorFusingMethodLimit = config.operatorFusingMethodLimit
+      operatorFusingMethodLimit = config.operatorFusingMethodLimit,
+      pipelinedDynamicSchedulingEnabled = config.pipelinedDynamicSchedulingEnabled
     )
   }
 
@@ -252,7 +253,8 @@ case class CypherRuntimeConfiguration(pipelinedBatchSizeSmall: Int,
                                       enableMonitors: Boolean,
                                       executionPlanCacheSize: Int,
                                       compiledExpressionMethodLimit: Int,
-                                      operatorFusingMethodLimit: Int) {
+                                      operatorFusingMethodLimit: Int,
+                                      pipelinedDynamicSchedulingEnabled: Boolean) {
 
   Preconditions.checkArgument(pipelinedBatchSizeSmall <= pipelinedBatchSizeBig, s"pipelinedBatchSizeSmall (got $pipelinedBatchSizeSmall) must be <= pipelinedBatchSizeBig (got $pipelinedBatchSizeBig)")
 

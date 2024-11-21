@@ -891,4 +891,9 @@ public class GraphDatabaseInternalSettings implements SettingsDeclaration
     public static final Setting<String> client_provided_router_suffix = newBuilder(
             "unsupported.dbms.routing.client_provided_address_suffix", STRING, "endpoints.neo4j.io")
             .build();
+
+    @Internal
+    @Description( "Feature flag to enable/disable dynamic scheduling in pipelined runtime." )
+    public static final Setting<Boolean> cypher_pipelined_dynamic_scheduling_enabled =
+            newBuilder( "unsupported.cypher.pipelined.enable_dynamic_scheduling", BOOL, true ).build();
 }
