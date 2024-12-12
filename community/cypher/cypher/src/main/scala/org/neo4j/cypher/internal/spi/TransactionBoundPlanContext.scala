@@ -253,7 +253,7 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
           }
           val valueCapability: ValueCapability = tps => {
             val categories = tps.map(typeToValueCategory)
-            if (!categories.exists(c => reference.getCapability.valueCapability(c) == IndexValueCapability.NO)) tps.map(_ => CanGetValue)
+            if (categories.forall(c => reference.getCapability.valueCapability(c) == IndexValueCapability.YES)) tps.map(_ => CanGetValue)
             else tps.map(_ => DoNotGetValue)
           }
           if (behaviours.contains(EventuallyConsistent)) {
