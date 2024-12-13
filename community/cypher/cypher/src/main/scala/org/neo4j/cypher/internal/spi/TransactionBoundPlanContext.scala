@@ -253,9 +253,11 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
           }
           val valueCapability: ValueCapability = tps => {
             val capability = tps.map(typeToValueCategory) match {
-              case Seq() => DoNotGetValue
-              case Seq(single) => if (reference.getCapability.valueCapability(single) == IndexValueCapability.YES) CanGetValue else DoNotGetValue
-              case categories => if (categories.exists(c => reference.getCapability.valueCapability(c) == IndexValueCapability.NO)) DoNotGetValue else CanGetValue
+              //in case of a single category the index must have full value capability
+              case Seq(c) if reference.getCapability.valueCapability(c) == IndexValueCapability.YES => CanGetValue
+              //for multiple categories we can allow some of them to have partial value capability.
+              case cs if cs.size > 1 && !cs.exists(c => reference.getCapability.valueCapability(c) == IndexValueCapability.NO) => CanGetValue
+              case _ => DoNotGetValue
             }
             tps.map(_ => capability)
           }
